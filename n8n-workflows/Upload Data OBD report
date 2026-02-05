@@ -1,0 +1,179 @@
+{
+  "name": "Upload Data OBD report",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "automotive-knowledge-base",
+          "mode": "list",
+          "cachedResultName": "automotive-knowledge-base"
+        },
+        "options": {
+          "pineconeNamespace": "={{ $json.Marca }}_{{ $json.Modello }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        32
+      ],
+      "id": "pinecone-node-id",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YOUR_PINECONE_CREDENTIAL_ID",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        240
+      ],
+      "id": "openai-embeddings-id",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 200,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        48,
+        480
+      ],
+      "id": "text-splitter-id",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -192,
+        224
+      ],
+      "id": "data-loader-id",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "formTitle": "Upload Data OBD report",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "PDF",
+              "fieldType": "file"
+            },
+            {
+              "fieldLabel": "Marca",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Alfa Romeo"
+                  },
+                  {
+                    "option": "Audi"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Modello"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        -624,
+        32
+      ],
+      "id": "form-trigger-id",
+      "name": "Upload Data",
+      "webhookId": "YOUR_UNIQUE_WEBHOOK_ID"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Data": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "sanitized-version-id",
+  "meta": {
+    "instanceId": "sanitized-instance-id"
+  },
+  "id": "sanitized-workflow-id",
+  "tags": []
+}
