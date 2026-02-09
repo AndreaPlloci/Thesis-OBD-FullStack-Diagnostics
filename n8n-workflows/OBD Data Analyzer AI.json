@@ -1,10 +1,10 @@
 {
-  "name": "OBD Data Analyzer AI",
+  "name": "Jarvis OBD Data Analyzer",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "automotive-obd-webhook",
+        "path": "automotive-diagnostic-webhook",
         "responseMode": "lastNode",
         "options": {}
       },
@@ -14,7 +14,7 @@
         -608,
         -80
       ],
-      "id": "webhook-node-id",
+      "id": "webhook-id",
       "name": "Webhook",
       "webhookId": "YOUR_UNIQUE_WEBHOOK_ID"
     },
@@ -36,12 +36,12 @@
         -368,
         352
       ],
-      "id": "pinecone-vector-store-id",
+      "id": "pinecone-id",
       "name": "Pinecone Vector Store",
       "credentials": {
         "pineconeApi": {
           "id": "YOUR_PINECONE_CREDENTIAL_ID",
-          "name": "PineconeApi account"
+          "name": "PineconeApi Account"
         }
       }
     },
@@ -55,12 +55,12 @@
         -288,
         560
       ],
-      "id": "openai-embeddings-id",
+      "id": "embeddings-id",
       "name": "Embeddings OpenAI",
       "credentials": {
         "openAiApi": {
           "id": "YOUR_OPENAI_CREDENTIAL_ID",
-          "name": "OpenAi account"
+          "name": "OpenAi Account"
         }
       }
     },
@@ -82,12 +82,12 @@
         -16,
         336
       ],
-      "id": "openai-chat-model-1-id",
+      "id": "openai-tool-model-id",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
           "id": "YOUR_OPENAI_CREDENTIAL_ID",
-          "name": "OpenAi account"
+          "name": "OpenAi Account"
         }
       }
     },
@@ -109,12 +109,12 @@
         -400,
         160
       ],
-      "id": "openai-chat-model-2-id",
+      "id": "openai-agent-model-id",
       "name": "OpenAI Chat Model2",
       "credentials": {
         "openAiApi": {
           "id": "YOUR_OPENAI_CREDENTIAL_ID",
-          "name": "OpenAi account"
+          "name": "OpenAi Account"
         }
       }
     },
@@ -130,15 +130,15 @@
         -288,
         128
       ],
-      "id": "memory-buffer-id",
+      "id": "memory-id",
       "name": "Simple Memory1"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=LINGUA REPORT: {{ $json.body.lingua }}\n\nDati Veicolo:\n- Auto: {{ $json.body.marca }} {{ $json.body.modello }} ({{ $json.body.anno }})\n- KM: {{ $json.body.kmAttuali }}\n- Motore: {{ $json.body.motore }}\n- Cambio: {{ $json.body.cambio }}\n\nStorico Manutenzione:\n{{ JSON.stringify($json.body.storicoLavori) }}\n\nDati Centralina:\n- Batteria: {{ $json.body.datiDallaCentralina.voltaggioBatteria }}\n- Errori: {{ $json.body.datiDallaCentralina.codiciErrore }}\n\nAnalizza i dati e consulta i manuali tecnici per generare il report in {{ $json.body.lingua }}.",
+        "text": "==LINGUA REPORT: {{ $json.body.lingua }}\n\nDati Veicolo:\n- Auto: {{ $json.body.marca }} {{ $json.body.modello }} ({{ $json.body.anno }})\n- KM: {{ $json.body.kmAttuali }}\n- Motore: {{ $json.body.motore }}\n- Cambio: {{ $json.body.cambio }}\n\nStorico Manutenzione:\n{{ JSON.stringify($json.body.storicoLavori) }}\n\nDati Diagnostici OBD (Real-time):\n- Batteria: {{ $json.body.datiDallaCentralina.voltaggioBatteria }}\n- Errori DTC: {{ $json.body.datiDallaCentralina.codiciErrore }}\n- Temp. Liquido (ECT): {{ $json.body.datiDallaCentralina.tempLiquidoRaffreddamento }}\n- Massa Aria (MAF): {{ $json.body.datiDallaCentralina.massaAria }}\n- Carico Motore: {{ $json.body.datiDallaCentralina.caricoMotore }}\n- Temp. Aspirazione (IAT): {{ $json.body.datiDallaCentralina.tempAspirazione }}\n- Pressione Rail: {{ $json.body.datiDallaCentralina.pressioneRail }}\n\nAnalizza i dati tecnici e consulta i manuali per generare il report in {{ $json.body.lingua }}.",
         "options": {
-          "systemMessage": "### IDENTITY\nSei Jarvis, Ingegnere Meccanico Senior. Devi essere tecnicamente inappuntabile.\n\n### REGOLE DI FORMATTAZIONE (TASSATIVE)\n1. Usa SEMPRE le barre verticali '|' per le tabelle.\n2. Ogni sezione deve essere racchiusa tra i suoi tag START/END.\n3. Lo STATO deve essere una sola parola: ROSSO, GIALLO o VERDE.\n\n### LOGICA TECNICA (BANCA DATI)\n- Cerca nel database il motore specifico.\n- Se un componente critico è oltre la scadenza e non è documentato, scrivi ROSSO.\n- CHECKLIST_MODELLO: Estrai dal database i difetti noti per questo modello/KM.\n\n### SCHEMA DI USCITA\n[START_ANALISI]\n(Analisi discorsiva qui)\n[END_ANALISI]\n\n[START_TABELLA]\n| Componente | Scadenza | STATO | Nota |\n|---|---|---|---|\n(Righe della tabella qui)\n[END_TABELLA]\n\n[START_CHECKLIST]\n(Elenco puntato dei difetti noti)\n[END_CHECKLIST]\n\n[START_OBD]\n(Analisi voltaggio e codici errore)\n[END_OBD]\n\n<DATA>\n{ \"health_score\": 0-100, \"consiglio_rapido\": \"...\" }\n</DATA>"
+          "systemMessage": "### IDENTITY & TONE\nSei Jarvis, un Ingegnere Meccanico Senior esperto in modelli Alfa Romeo e Audi. Il tuo approccio è analitico e rigoroso.\n\n### PROTOCOLLO DI STANDARDIZZAZIONE (OBBLIGATORIO)\nValuta sistematicamente i 7 pilastri della meccanica: Distribuzione, Olio/Filtri, Trasmissione, Sospensioni, Post-trattamento (DPF/EGR), Freni, Impianto Elettrico.\n\n### LOGICA DIAGNOSTICA OBD\nInterpreta i dati fisici ricevuti: ECT, MAF, RAIL PRESSURE e DTC."
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -147,12 +147,12 @@
         -304,
         -80
       ],
-      "id": "ai-agent-id",
+      "id": "agent-id",
       "name": "AI Agent"
     },
     {
       "parameters": {
-        "description": "Utilizza questo strumento per consultare i manuali d'officina ufficiali.",
+        "description": "Consultazione manuali d'officina ufficiali.",
         "topK": 15
       },
       "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
@@ -161,12 +161,12 @@
         -160,
         128
       ],
-      "id": "vector-store-tool-id",
+      "id": "tool-id",
       "name": "ricerca_manuali_tecnici"
     },
     {
       "parameters": {
-        "jsCode": "// (Codice JavaScript per la formattazione HTML mantenuto intatto per funzionalità)"
+        "jsCode": "// Codice di formattazione HTML per il report finale"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -174,7 +174,7 @@
         32,
         -80
       ],
-      "id": "js-code-format-id",
+      "id": "code-id",
       "name": "Code in JavaScript"
     },
     {
@@ -190,18 +190,17 @@
         256,
         -80
       ],
-      "id": "gmail-node-id",
+      "id": "gmail-id",
       "name": "Send a message",
-      "webhookId": "YOUR_GMAIL_WEBHOOK_ID",
+      "webhookId": "YOUR_UNIQUE_WEBHOOK_ID",
       "credentials": {
         "gmailOAuth2": {
           "id": "YOUR_GMAIL_CREDENTIAL_ID",
-          "name": "Gmail account"
+          "name": "Gmail Account"
         }
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Webhook": { "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]] },
     "Pinecone Vector Store": { "ai_vectorStore": [[{ "node": "ricerca_manuali_tecnici", "type": "ai_vectorStore", "index": 0 }]] },
@@ -209,17 +208,13 @@
     "OpenAI Chat Model1": { "ai_languageModel": [[{ "node": "ricerca_manuali_tecnici", "type": "ai_languageModel", "index": 0 }]] },
     "OpenAI Chat Model2": { "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]] },
     "Simple Memory1": { "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]] },
-    "ricerca_manuali_tecnici": { "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]] },
     "AI Agent": { "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }]] },
+    "ricerca_manuali_tecnici": { "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]] },
     "Code in JavaScript": { "main": [[{ "node": "Send a message", "type": "main", "index": 0 }]] }
   },
-  "active": false,
-  "settings": { "executionOrder": "v1" },
-  "versionId": "sanitized-version-id",
+  "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "sanitized-instance-id"
-  },
-  "id": "sanitized-workflow-id",
-  "tags": []
+  }
 }
