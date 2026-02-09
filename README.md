@@ -1,50 +1,91 @@
-# Jarvis OBD: AI-Driven Automotive Diagnostic Ecosystem 🚗🤖
+# Jarvis OBD: Full-Stack AI Automotive Diagnostic Ecosystem 🚗🤖
 
-**Jarvis OBD** is a high-performance diagnostic and predictive maintenance solution that bridges the gap between raw vehicle data and professional mechanical engineering. Integrated into the **Jarvis Ecosystem**, this project utilizes a native Android client and a sophisticated **RAG (Retrieval-Augmented Generation)** backend to provide context-aware vehicle health reports[cite: 4, 45, 46].
+**Jarvis OBD** is a high-performance diagnostic and predictive maintenance ecosystem designed to bridge the gap between raw vehicular telemetry and professional mechanical engineering. Integrated into the broader **Jarvis Infrastructure**, this project leverages a native Android client and a sophisticated **RAG (Retrieval-Augmented Generation)** backend to deliver industrial-grade vehicle health insights.
 
-The system analyzes Diagnostic Trouble Codes (DTC) against a technical knowledge base of workshop manuals—specifically optimized for models like the **Alfa Romeo 159**—delivering industrial-grade insights through autonomous AI agents[cite: 5, 54, 55].
-
----
-
-## 🏗 The Jarvis Infrastructure (Backbone)
-
-The entire system runs on a custom-built, headless Windows server ("Jarvis") optimized for total autonomy and security[cite: 21, 24, 25]:
-
-* **Network Security**: Protected by a **Tailscale VPN Mesh**, allowing encrypted remote access without open ports[cite: 28, 29, 30].
-* **Infrastructure Management**: Features a **Telegram-based Remote Ops** bot for system administration, including /screenshot, /status, and /reboot commands with Chat-ID validation[cite: 8, 85, 86, 90].
-* **Performance Monitoring**: A proactive **Health Monitor** polls 6 data sources every 10 minutes via PowerShell, using **Linear Regression** to predict storage trends and prevent downtime[cite: 58, 59, 71, 72].
-* **DNS Filtering**: Integrates **AdGuard Home** as a DNS Sinkhole to optimize bandwidth and block trackers system-wide[cite: 36, 40, 41].
+Unlike standard OBD scanners, this system performs real-time correlation between ECU live data and a vectorized technical knowledge base, enabling autonomous AI agents to provide context-aware troubleshooting.
 
 ---
 
-## ✨ Core Engineering Features
+## 🏗️ Infrastructure Architecture (The Backbone)
 
-* **Industrial ETL Migration**: Successfully migrated the data pipeline from Google Sheets to a local **MariaDB (SQL)** instance[cite: 7, 75, 78]. This move ensures strong typing (DATETIME, FLOAT), total data sovereignty, and high-speed querying[cite: 79, 80, 81].
-* **Technical RAG Pipeline**: Implements a recursive splitting strategy (1000 characters with 200 overlap) to maintain technical context during the vectorization of official manuals into **Pinecone**[cite: 6, 48, 49, 52].
-* **Smart Diagnostics**: The Android client (Kotlin/Jetpack Compose) connects via Bluetooth to ELM327 adapters to monitor battery voltage and ECU error codes in real-time[cite: 1].
-* **Predictive Reporting**: An AI Agent (GPT-4o-mini) cross-references live OBD data with the vector store to assign a color-coded health status (Green/Yellow/Red) and generate automated HTML reports via Gmail[cite: 54, 146].
+The ecosystem is hosted on a private, headless Windows Server node ("Jarvis"), engineered for 24/7 orchestration and high availability.
+
+* **Security & Connectivity:** Communication is encapsulated within a **Tailscale VPN Mesh**, creating a zero-trust network environment. This allows the Android client to reach the n8n webhooks securely without exposing any public ports.
+* **Proactive System Health:** A dedicated **Health Monitor** polls system vitals (CPU, RAM, Disk I/O) every 30 minutes via **PowerShell and WMI**. Telemetry is logged into a local SQL instance to ensure infrastructure stability during heavy RAG operations.
+* **Network Optimization:** **AdGuard Home** is integrated as a network-wide DNS sinkhole, managing telemetry traffic and optimizing query latency.
 
 ---
 
-## 🛠 Tech Stack
+## 📱 Mobile Engineering & OBD-II Protocol
 
-* **Frontend**: Kotlin, Jetpack Compose, Retrofit, Coroutines[cite: 1].
-* **Automation/Orchestration**: n8n, PowerShell (WMI Automation), JavaScript[cite: 1, 59, 81].
-* **AI/Vector Databases**: OpenAI GPT-4o-mini, Pinecone Vector Store, Gemini 2.0 Flash[cite: 67, 146, 147].
-* **Database Management**: MariaDB (SQL), XAMPP Stack, FileMaker (for logic mapping)[cite: 1, 32, 101, 147].
-* **Networking**: Tailscale VPN, AdGuard Home, RDP[cite: 1, 28, 36, 147].
+The Android application is a native client built with **Kotlin** and **Jetpack Compose**, designed for low-latency communication with ELM327-compatible hardware.
+
+### Protocol Implementation
+The client implements a robust polling mechanism for the **ISO 15765-4 (CAN 11/500)** protocol, managing sequential Parameter ID (PID) requests:
+* **Real-time Monitoring:** Tracks critical engine metrics including **Fuel Rail Pressure**, **Mass Air Flow (MAF)**, **Engine Load**, and **Coolant Temperature (ECT)**.
+* **Fault Management:** Performs full scans of Diagnostic Trouble Codes (DTCs), retrieving both active and pending errors from the ECU memory.
+* **Network Layer:** Utilizes **Retrofit 2** with asynchronous Coroutines to dispatch diagnostic payloads to the AI backend via secure webhooks.
+
+
+
+---
+
+## 🧠 AI Orchestration & Technical RAG
+
+The core intelligence of the system relies on a **Retrieval-Augmented Generation (RAG)** pipeline that transforms unstructured technical manuals into actionable data.
+
+* **Vectorization Strategy:** Official workshop manuals (specifically optimized for Alfa Romeo and Audi platforms) are processed using a **Recursive Character Text Splitting** strategy. We utilize a 1000-character window with a 200-character overlap to preserve the integrity of technical tables, torque specifications, and mechanical tolerances.
+* **Vector Store:** Embeddings are indexed in a **Pinecone Vector Store**, allowing for high-dimensional semantic searches.
+* **Autonomous Reasoning:** An AI Agent (utilizing **GPT-4o-mini**) receives the live OBD-II payload, retrieves the relevant technical context from Pinecone, and synthesizes a professional diagnostic report.
+
+
+
+---
+
+## 📊 Data Engineering & SQL Persistence
+
+A critical evolution of the project was the migration from flat-file storage to a structured relational database environment.
+
+* **SQL Integration:** The system utilizes **MariaDB/MySQL** for high-precision data persistence.
+* **Relational Schema:** The database manages complex relationships between User IDs, Vehicle VINs, Diagnostic Sessions, and AI-generated Maintenance Reports.
+* **Data Sovereignty:** By hosting the database locally on the Jarvis node, the system ensures total privacy of sensitive financial and technical records, facilitating advanced historical trend analysis and predictive maintenance scheduling.
+
+
+
+---
+
+## 🛠️ Tech Stack
+
+### Mobile Development
+* **Languages:** Kotlin
+* **UI Framework:** Jetpack Compose (Material 3)
+* **Networking:** Retrofit 2, OkHttp, Gson
+* **Hardware:** Bluetooth API (ELM327 / OBD-II)
+
+### AI & Automation
+* **Orchestration:** n8n
+* **LLMs:** OpenAI GPT-4o-mini, Google Gemini 2.0 Flash
+* **Vector DB:** Pinecone
+* **Embeddings:** OpenAI `text-embedding-3-small`
+
+### Infrastructure
+* **OS:** Windows Server (Headless)
+* **Database:** MariaDB / MySQL
+* **Scripting:** PowerShell, JavaScript (Node.js)
+* **Networking:** Tailscale VPN, AdGuard Home
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-├── android-app/             # Native Kotlin source code
-│   ├── ui/                  # Jetpack Compose Material 3 screens
-│   ├── network/             # Retrofit configurations for n8n webhooks
-│   └── data/                # Data models for OBD and maintenance logs
-├── n8n-workflows/           # JSON exports for automation logic
-│   ├── jarvis_diagnostic.json # Main RAG and AI Analysis agent
-│   ├── health_monitor.json  # PowerShell resource monitoring
-│   └── nas_sort_agent.json  # GPT-based file categorization logic
+├── android-app/             # Native Android source code
+│   ├── ui/                  # Material 3 Compose screens & themes
+│   ├── network/             # API services and Retrofit config
+│   ├── data/                # Data classes for OBD PIDs and ECU logs
+│   └── manager/             # Bluetooth and protocol logic
+├── n8n-workflows/           # JSON exports for backend orchestration
+│   ├── diagnostic_rag.json  # Main AI Diagnostic & RAG agent
+│   ├── server_monitor.json  # System health and SQL logging
+│   └── financial_cfo.json   # NL2SQL finance management module
 └── README.md
