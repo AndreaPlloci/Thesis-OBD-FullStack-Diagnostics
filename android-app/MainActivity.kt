@@ -1,4 +1,4 @@
-package com.example.automotive.obdapp // Nome del package reso generico
+package com.example.automotive.obdapp
 
 import android.Manifest
 import android.bluetooth.BluetoothManager
@@ -41,7 +41,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// --- COSTANTI DI SISTEMA ---
+// --- DESIGN SYSTEM ---
 val AutomotiveRed = Color(0xFFB71C1C)
 val SuccessGreen = Color(0xFF2E7D32)
 
@@ -98,11 +98,7 @@ fun SuccessScreen(marca: String, onDone: () -> Unit) {
     LaunchedEffect(Unit) { startAnimation = true }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp).background(Color.White), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Image(
-            painter = painterResource(id = logoRes),
-            contentDescription = null,
-            modifier = Modifier.size(220.dp).scale(scale).padding(bottom = 32.dp)
-        )
+        Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(220.dp).scale(scale).padding(bottom = 32.dp))
         Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(50.dp).scale(scale), tint = SuccessGreen)
         Spacer(modifier = Modifier.height(24.dp))
         Text("REPORT INVIATO!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = SuccessGreen)
@@ -122,10 +118,7 @@ fun SelectionScreen(obdManager: ObdManager, onConnectionSuccess: (ReportRequest)
     val lingue = listOf("Italiano", "English", "Deutsch")
     val marche = listOf("Audi", "Alfa Romeo")
 
-    val modelliPerMarca = mapOf(
-        "Audi" to listOf("A3"),
-        "Alfa Romeo" to listOf("159", "Giulia")
-    )
+    val modelliPerMarca = mapOf("Audi" to listOf("A3"), "Alfa Romeo" to listOf("159", "Giulia"))
 
     val databaseAuto = mapOf(
         "A3" to mapOf(
@@ -188,7 +181,7 @@ fun SelectionScreen(obdManager: ObdManager, onConnectionSuccess: (ReportRequest)
         }
 
         OutlinedButton(onClick = {
-            onConnectionSuccess(ReportRequest(email="", lingua=lingua.ifEmpty{"IT"}, marca=marca.ifEmpty{"Alfa Romeo"}, modello=modello.ifEmpty{"159"}, anno=anno.ifEmpty{"2010"}, motore=motore.ifEmpty{"1.9"}, cambio=cambio.ifEmpty{"M"}, kmAttuali=kmAttuali.ifEmpty{"150000"}, storicoLavori=emptyList(), datiDallaCentralina=ObdData()))
+            onConnectionSuccess(ReportRequest(email="", lingua=lingua.ifEmpty{"IT"}, marca=marca.ifEmpty{"Alfa Romeo"}, modello=modello.ifEmpty{"159"}, anno=anno.ifEmpty{"2010"}, motore=motore.ifEmpty{"1.9"}, cambio=cambio.ifEmpty{"M"}, kmAttuali=kmAttuali.ifEmpty{"150000"}, storicoLavori=emptyList(), datiDallaCentralina=ObdData(voltaggioBatteria="12.8V", codiciErrore=listOf("P0000"), tempLiquidoRaffreddamento="88°C", massaAria="10.2 g/s", caricoMotore="18%", tempAspirazione="32°C", pressioneRail="295 bar")))
         }, modifier = Modifier.fillMaxWidth()) { Text("MODALITÀ TEST (SIMULAZIONE)") }
     }
 
@@ -218,15 +211,24 @@ fun SelectionScreen(obdManager: ObdManager, onConnectionSuccess: (ReportRequest)
 @Composable
 fun ReadingScreen(obdManager: ObdManager, onScanComplete: (ObdData) -> Unit) {
     var progress by remember { mutableStateOf(0f) }
-    var status by remember { mutableStateOf("Inizializzazione...") }
+    var status by remember { mutableStateOf("Inizializzazione protocollo ISO 15765-4...") }
     LaunchedEffect(Unit) {
-        delay(800); status = "Lettura Voltaggio..."; progress = 0.4f
-        delay(800); status = "Scansione DTC..."; progress = 0.8f
-        delay(500); onScanComplete(ObdData("12.8V", listOf("P0000")))
+        delay(600); status = "Lettura Voltaggio Batteria..."; progress = 0.15f
+        val volt = obdManager.readVoltage() 
+        delay(600); status = "Acquisizione ECT (Coolant Temp)..."; progress = 0.35f
+        val temp = obdManager.getParam("0105") 
+        delay(600); status = "Analisi Carico Motore e MAF..."; progress = 0.55f
+        val load = obdManager.getParam("0104"); val maf = obdManager.getParam("0110")  
+        delay(600); status = "Verifica Pressione Rail (Common Rail)..."; progress = 0.75f
+        val rail = obdManager.getParam("0123") 
+        delay(600); status = "Scansione Errori DTC in memoria..."; progress = 1.0f
+        val dtcs = obdManager.readDtc() 
+        delay(400); onScanComplete(ObdData(voltaggioBatteria=volt, codiciErrore=dtcs, tempLiquidoRaffreddamento=temp, massaAria=maf, caricoMotore=load, tempAspirazione="32°C", pressioneRail=rail))
     }
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        CircularProgressIndicator(progress = progress, modifier = Modifier.size(100.dp), color = AutomotiveRed)
-        Spacer(modifier = Modifier.height(20.dp)); Text(status)
+        CircularProgressIndicator(progress = progress, modifier = Modifier.size(100.dp), color = AutomotiveRed, strokeWidth = 8.dp)
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(status, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -253,27 +255,19 @@ fun DiagnosticScreen(initialReport: ReportRequest?, onSendSuccess: () -> Unit, o
             }
             item { TextButton(onClick = { works.add(MaintenanceWork()) }) { Icon(Icons.Default.Add, null); Text("Aggiungi") } }
         }
-
         Button(onClick = {
             isSending = true
             scope.launch {
-                // URL mascherati per protezione privacy
+                // Mascheramento URL per protezione infrastruttura privata
                 val testUrl = "https://YOUR_PRIVATE_SERVER.ts.net/webhook-test/obd-diagnostic"
                 val prodUrl = "https://YOUR_PRIVATE_SERVER.ts.net/webhook/obd-diagnostic"
                 
                 val finalReport = initialReport!!.copy(email = email, storicoLavori = works.toList())
-
                 val callTest = async { try { RetrofitClient.instance.sendReport(testUrl, finalReport).isSuccessful } catch(e: Exception) { false } }
                 val callProd = async { try { RetrofitClient.instance.sendReport(prodUrl, finalReport).isSuccessful } catch(e: Exception) { false } }
-
-                val successTest = callTest.await()
-                val successProd = callProd.await()
-
-                if (successTest || successProd) {
-                    onSendSuccess()
-                } else {
-                    Toast.makeText(context, "Connessione fallita su entrambi gli endpoint.", Toast.LENGTH_LONG).show()
-                }
+                
+                if (callTest.await() || callProd.await()) onSendSuccess()
+                else Toast.makeText(context, "Connessione fallita su entrambi gli endpoint.", Toast.LENGTH_LONG).show()
                 isSending = false
             }
         }, enabled = email.contains("@") && !isSending, modifier = Modifier.fillMaxWidth().height(60.dp)) {
