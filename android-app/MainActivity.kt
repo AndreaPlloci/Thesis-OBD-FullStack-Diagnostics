@@ -1,6 +1,7 @@
 package com.example.automotive.obdapp
 
 import android.Manifest
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.os.Bundle
@@ -41,7 +42,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// --- DESIGN SYSTEM ---
+// --- BRANDING & DESIGN SYSTEM ---
 val AutomotiveRed = Color(0xFFB71C1C)
 val SuccessGreen = Color(0xFF2E7D32)
 
@@ -64,16 +65,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation(obdManager: ObdManager) {
-    var currentScreen by remember { mutableStateOf("selection") }
+    var currentScreen by remember { mutableStateOf("connection") }
     var reportData by remember { mutableStateOf<ReportRequest?>(null) }
     var liveObdData by remember { mutableStateOf(ObdData()) }
+    var selectedDevice by remember { mutableStateOf<BluetoothDevice?>(null) }
 
     when (currentScreen) {
-        "selection" -> SelectionScreen(obdManager) { partialReport ->
+        "connection" -> ConnectionScreen(obdManager) { device ->
+            selectedDevice = device
+            currentScreen = "selection"
+        }
+        "selection" -> SelectionScreen { partialReport ->
             reportData = partialReport
             currentScreen = "reading"
         }
-        "reading" -> ReadingScreen(obdManager) { scannedData ->
+        "reading" -> ReadingScreen(obdManager, selectedDevice, reportData) { scannedData ->
             liveObdData = scannedData
             currentScreen = "diagnostic"
         }
@@ -84,42 +90,60 @@ fun AppNavigation(obdManager: ObdManager) {
         )
         "success" -> SuccessScreen(
             marca = reportData?.marca ?: "Alfa Romeo",
-            onDone = { currentScreen = "selection" }
+            onDone = { currentScreen = "connection" }
         )
     }
 }
 
 @Composable
-fun SuccessScreen(marca: String, onDone: () -> Unit) {
-    var startAnimation by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (startAnimation) 1.0f else 0f, animationSpec = tween(1000))
-    val logoRes: Int = if (marca.contains("Alfa", true)) R.drawable.logo_alfa else R.drawable.logo_audi
+fun ConnectionScreen(obdManager: ObdManager, onConnected: (BluetoothDevice) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isConnecting by remember { mutableStateOf(false) }
+    var showDeviceDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { startAnimation = true }
+    Column(modifier = Modifier.fillMaxSize().padding(top = 70.dp, start = 20.dp, end = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Jarvis Hub", style = MaterialTheme.typography.headlineMedium, color = AutomotiveRed, fontWeight = FontWeight.Bold)
+        Text("Hardware Check: Connect the OBD-II interface to begin.", color = Color.Gray, textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(40.dp))
+        Button(onClick = { showDeviceDialog = true }, modifier = Modifier.fillMaxWidth().height(60.dp), enabled = !isConnecting) {
+            if (isConnecting) CircularProgressIndicator(color = Color.White)
+            else Text("SCAN & CONNECT OBD", fontWeight = FontWeight.Bold)
+        }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp).background(Color.White), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(220.dp).scale(scale).padding(bottom = 32.dp))
-        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(50.dp).scale(scale), tint = SuccessGreen)
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("REPORT INVIATO!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = SuccessGreen)
-        Text("Jarvis ha completato l'analisi predittiva\nper la tua $marca.", textAlign = TextAlign.Center, color = Color.Gray)
-        Spacer(modifier = Modifier.height(60.dp))
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(60.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Black)) {
-            Text("TORNA ALLA DASHBOARD", fontWeight = FontWeight.Bold)
+        if (showDeviceDialog) {
+            Dialog(onDismissRequest = { showDeviceDialog = false }) {
+                Card {
+                    val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+                    val devices = bluetoothManager.adapter.bondedDevices
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Select Device", color = AutomotiveRed, style = MaterialTheme.typography.titleLarge)
+                        LazyColumn {
+                            items(devices.toList()) { dev ->
+                                Text(dev.name ?: dev.address, modifier = Modifier.fillMaxWidth().clickable {
+                                    showDeviceDialog = false; isConnecting = true
+                                    scope.launch {
+                                        if (obdManager.connect(dev, "0")) onConnected(dev)
+                                        else { isConnecting = false; Toast.makeText(context, "OBD not responding", Toast.LENGTH_SHORT).show() }
+                                    }
+                                }.padding(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SelectionScreen(obdManager: ObdManager, onConnectionSuccess: (ReportRequest) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+fun SelectionScreen(onFormComplete: (ReportRequest) -> Unit) {
     val lingue = listOf("Italiano", "English", "Deutsch")
     val marche = listOf("Audi", "Alfa Romeo")
-
     val modelliPerMarca = mapOf("Audi" to listOf("A3"), "Alfa Romeo" to listOf("159", "Giulia"))
 
+    // VEHICLE DATA CONFIGURATION
     val databaseAuto = mapOf(
         "A3" to mapOf(
             "1.6 TDI (105/110cv)" to listOf("Manuale (5/6m)", "S-tronic (7m)"),
@@ -156,79 +180,74 @@ fun SelectionScreen(obdManager: ObdManager, onConnectionSuccess: (ReportRequest)
     var motore by remember { mutableStateOf("") }
     var cambio by remember { mutableStateOf("") }
     var kmAttuali by remember { mutableStateOf("") }
-    var showDeviceDialog by remember { mutableStateOf(false) }
-    var isConnecting by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(top = 70.dp, start = 20.dp, end = 20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Vehicle Intelligence Hub", style = MaterialTheme.typography.headlineMedium, color = AutomotiveRed, fontWeight = FontWeight.Bold)
-        MenuTendina("Lingua Report", lingua, lingue) { lingua = it }
-        MenuTendina("Marca", marca, marche) { if (marca != it) { marca = it; modello = ""; anno = ""; motore = ""; cambio = "" } }
-        if (marca.isNotEmpty()) MenuTendina("Modello", modello, modelliPerMarca[marca] ?: emptyList()) { if (modello != it) { modello = it; anno = ""; motore = ""; cambio = "" } }
-        if (modello.isNotEmpty()) OutlinedTextField(value = anno, onValueChange = { if (it.length <= 4) anno = it }, label = { Text("Anno") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        Text("Vehicle Details", style = MaterialTheme.typography.headlineMedium, color = AutomotiveRed, fontWeight = FontWeight.Bold)
+        MenuTendina("Report Language", lingua, lingue) { lingua = it }
+        MenuTendina("Make", marca, marche) { if (marca != it) { marca = it; modello = ""; anno = ""; motore = ""; cambio = "" } }
+        if (marca.isNotEmpty()) MenuTendina("Model", modello, modelliPerMarca[marca] ?: emptyList()) { if (modello != it) { modello = it; anno = ""; motore = ""; cambio = "" } }
+        if (modello.isNotEmpty()) OutlinedTextField(value = anno, onValueChange = { if (it.length <= 4) anno = it }, label = { Text("Year") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         if (anno.length == 4) {
             val motori = databaseAuto[modello]?.keys?.toList() ?: listOf("Standard")
-            MenuTendina("Motorizzazione", motore, motori) { motore = it; cambio = "" }
+            MenuTendina("Engine Type", motore, motori) { motore = it; cambio = "" }
         }
         if (motore.isNotEmpty()) {
             val cambi = databaseAuto[modello]?.get(motore) ?: listOf("Manuale")
-            MenuTendina("Tipo di Cambio", cambio, cambi) { cambio = it }
+            MenuTendina("Transmission Type", cambio, cambi) { cambio = it }
         }
-        if (cambio.isNotEmpty()) OutlinedTextField(value = kmAttuali, onValueChange = { kmAttuali = it }, label = { Text("KM Attuali") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        if (cambio.isNotEmpty()) OutlinedTextField(value = kmAttuali, onValueChange = { kmAttuali = it }, label = { Text("Current Mileage (KM)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
 
         Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = { showDeviceDialog = true }, enabled = kmAttuali.isNotEmpty() && !isConnecting, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            if (isConnecting) CircularProgressIndicator(color = Color.White) else Text("CONNETTI E SCANSIONA")
-        }
-
-        OutlinedButton(onClick = {
-            onConnectionSuccess(ReportRequest(email="", lingua=lingua.ifEmpty{"IT"}, marca=marca.ifEmpty{"Alfa Romeo"}, modello=modello.ifEmpty{"159"}, anno=anno.ifEmpty{"2010"}, motore=motore.ifEmpty{"1.9"}, cambio=cambio.ifEmpty{"M"}, kmAttuali=kmAttuali.ifEmpty{"150000"}, storicoLavori=emptyList(), datiDallaCentralina=ObdData(voltaggioBatteria="12.8V", codiciErrore=listOf("P0000"), tempLiquidoRaffreddamento="88°C", massaAria="10.2 g/s", caricoMotore="18%", tempAspirazione="32°C", pressioneRail="295 bar")))
-        }, modifier = Modifier.fillMaxWidth()) { Text("MODALITÀ TEST (SIMULAZIONE)") }
-    }
-
-    if (showDeviceDialog) {
-        Dialog(onDismissRequest = { showDeviceDialog = false }) {
-            Card {
-                val devices = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter.bondedDevices
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Seleziona OBD", color = AutomotiveRed, style = MaterialTheme.typography.titleLarge)
-                    LazyColumn {
-                        items(devices.toList()) { dev ->
-                            Text(dev.name ?: dev.address, modifier = Modifier.fillMaxWidth().clickable {
-                                showDeviceDialog = false; isConnecting = true
-                                scope.launch {
-                                    if (obdManager.connect(dev)) onConnectionSuccess(ReportRequest(email="", lingua=lingua, marca=marca, modello=modello, anno=anno, motore=motore, cambio=cambio, kmAttuali=kmAttuali, storicoLavori=emptyList(), datiDallaCentralina=ObdData()))
-                                    else { isConnecting = false; Toast.makeText(context, "Errore Connessione", Toast.LENGTH_SHORT).show() }
-                                }
-                            }.padding(16.dp))
-                        }
-                    }
-                }
-            }
-        }
+        Button(
+            onClick = { onFormComplete(ReportRequest("", lingua, marca, modello, anno, motore, cambio, kmAttuali, emptyList(), ObdData())) },
+            enabled = kmAttuali.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) { Text("START ECU SCAN", fontWeight = FontWeight.Bold) }
     }
 }
 
 @Composable
-fun ReadingScreen(obdManager: ObdManager, onScanComplete: (ObdData) -> Unit) {
+fun ReadingScreen(obdManager: ObdManager, device: BluetoothDevice?, reportData: ReportRequest?, onScanComplete: (ObdData) -> Unit) {
     var progress by remember { mutableStateOf(0f) }
-    var status by remember { mutableStateOf("Inizializzazione protocollo ISO 15765-4...") }
+    var status by remember { mutableStateOf("Preparing Protocol...") }
+
     LaunchedEffect(Unit) {
-        delay(600); status = "Lettura Voltaggio Batteria..."; progress = 0.15f
-        val volt = obdManager.readVoltage() 
-        delay(600); status = "Acquisizione ECT (Coolant Temp)..."; progress = 0.35f
-        val temp = obdManager.getParam("0105") 
-        delay(600); status = "Analisi Carico Motore e MAF..."; progress = 0.55f
-        val load = obdManager.getParam("0104"); val maf = obdManager.getParam("0110")  
-        delay(600); status = "Verifica Pressione Rail (Common Rail)..."; progress = 0.75f
-        val rail = obdManager.getParam("0123") 
-        delay(600); status = "Scansione Errori DTC in memoria..."; progress = 1.0f
-        val dtcs = obdManager.readDtc() 
-        delay(400); onScanComplete(ObdData(voltaggioBatteria=volt, codiciErrore=dtcs, tempLiquidoRaffreddamento=temp, massaAria=maf, caricoMotore=load, tempAspirazione="32°C", pressioneRail=rail))
+        // Specific protocol selection: Alfa 159 often requires K-Line (ISO 14230-4) or specific CAN settings
+        val targetProtocol = if (reportData?.modello == "159") "5" else "0"
+        obdManager.connect(device!!, targetProtocol)
+        delay(2000)
+
+        // POLLING LOGIC (Ensuring data retrieval for mission-critical PIDs)
+        suspend fun pollUntilData(pid: String, label: String, startP: Float, endP: Float): String {
+            status = "Reading $label..."; progress = startP
+            var value = "N/A"
+            var attempt = 1
+            while (value == "N/A") {
+                value = obdManager.getParam(pid)
+                if (value != "N/A") break
+                status = "Reading $label (Retry... $attempt)"
+                attempt++
+                delay(1200) // Critical delay for stable communication over older K-Line buses
+            }
+            progress = endP
+            return value
+        }
+
+        val volt = obdManager.readVoltage()
+        val temp = pollUntilData("0105", "ECT (Coolant Temp)", 0.15f, 0.35f)
+        val load = pollUntilData("0104", "Engine Load", 0.35f, 0.55f)
+        val maf = pollUntilData("0110", "MAF (Mass Air Flow)", 0.55f, 0.75f)
+        val rail = pollUntilData("0123", "Fuel Rail Pressure", 0.75f, 0.90f)
+
+        status = "Scanning DTC Memory..."; progress = 0.95f
+        val dtcs = obdManager.readDtc()
+
+        onScanComplete(ObdData(volt, dtcs, temp, maf, load, "32°C", rail))
     }
+
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressIndicator(progress = progress, modifier = Modifier.size(100.dp), color = AutomotiveRed, strokeWidth = 8.dp)
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(status, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(20.dp)); Text(status, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -241,39 +260,52 @@ fun DiagnosticScreen(initialReport: ReportRequest?, onSendSuccess: () -> Unit, o
     var isSending by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(top = 70.dp, start = 20.dp, end = 20.dp)) {
-        Text("Dati Finali per Jarvis", style = MaterialTheme.typography.headlineSmall, color = AutomotiveRed, fontWeight = FontWeight.Bold)
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+        Text("Final Step", style = MaterialTheme.typography.headlineSmall, color = AutomotiveRed, fontWeight = FontWeight.Bold)
+        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Your Email") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(10.dp))
         LazyColumn(modifier = Modifier.weight(1f)) {
             itemsIndexed(works) { idx, w ->
                 Row(modifier = Modifier.padding(vertical = 4.dp)) {
                     OutlinedTextField(value = w.km, onValueChange = { works[idx] = w.copy(km = it) }, modifier = Modifier.weight(0.3f), label = { Text("KM") })
                     Spacer(modifier = Modifier.width(4.dp))
-                    OutlinedTextField(value = w.descrizione, onValueChange = { works[idx] = w.copy(descrizione = it) }, modifier = Modifier.weight(0.7f), label = { Text("Lavoro") })
+                    OutlinedTextField(value = w.descrizione, onValueChange = { works[idx] = w.copy(descrizione = it) }, modifier = Modifier.weight(0.7f), label = { Text("Service Description") })
                     IconButton(onClick = { if (works.size > 1) works.removeAt(idx) }) { Icon(Icons.Default.Delete, null) }
                 }
             }
-            item { TextButton(onClick = { works.add(MaintenanceWork()) }) { Icon(Icons.Default.Add, null); Text("Aggiungi") } }
+            item { TextButton(onClick = { works.add(MaintenanceWork()) }) { Icon(Icons.Default.Add, null); Text("Add Previous Maintenance Record") } }
         }
         Button(onClick = {
             isSending = true
             scope.launch {
-                // Mascheramento URL per protezione infrastruttura privata
-                val testUrl = "https://YOUR_PRIVATE_SERVER.ts.net/webhook-test/obd-diagnostic"
-                val prodUrl = "https://YOUR_PRIVATE_SERVER.ts.net/webhook/obd-diagnostic"
-                
-                val finalReport = initialReport!!.copy(email = email, storicoLavori = works.toList())
-                val callTest = async { try { RetrofitClient.instance.sendReport(testUrl, finalReport).isSuccessful } catch(e: Exception) { false } }
-                val callProd = async { try { RetrofitClient.instance.sendReport(prodUrl, finalReport).isSuccessful } catch(e: Exception) { false } }
-                
-                if (callTest.await() || callProd.await()) onSendSuccess()
-                else Toast.makeText(context, "Connessione fallita su entrambi gli endpoint.", Toast.LENGTH_LONG).show()
-                isSending = false
+                // Masked endpoint for system privacy
+                val url = "https://YOUR_PRIVATE_SERVER.ts.net/webhook/obd-diagnostic"
+                if (RetrofitClient.instance.sendReport(url, initialReport!!.copy(email = email, storicoLavori = works.toList())).isSuccessful) onSendSuccess()
+                else { isSending = false; Toast.makeText(context, "Cloud Connection Error", Toast.LENGTH_SHORT).show() }
             }
         }, enabled = email.contains("@") && !isSending, modifier = Modifier.fillMaxWidth().height(60.dp)) {
-            if (isSending) CircularProgressIndicator(color = Color.White) else Text("GENERA REPORT")
+            if (isSending) CircularProgressIndicator(color = Color.White) else Text("GENERATE AI REPORT")
         }
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Indietro", color = Color.Gray) }
+    }
+}
+
+@Composable
+fun SuccessScreen(marca: String, onDone: () -> Unit) {
+    var startAnimation by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (startAnimation) 1.0f else 0f, animationSpec = tween(1000))
+    val logoRes: Int = if (marca.contains("Alfa", true)) R.drawable.logo_alfa else R.drawable.logo_audi
+
+    LaunchedEffect(Unit) { startAnimation = true }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp).background(Color.White), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Image(painter = painterResource(id = logoRes), modifier = Modifier.size(220.dp).scale(scale).padding(bottom = 32.dp), contentDescription = null)
+        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(50.dp).scale(scale), tint = SuccessGreen)
+        Spacer(modifier = Modifier.height(24.dp))
+        Text("REPORT DISPATCHED!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = SuccessGreen)
+        Text("Jarvis AI has completed the analysis for your $marca.", textAlign = TextAlign.Center, color = Color.Gray)
+        Spacer(modifier = Modifier.height(60.dp))
+        Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(60.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Black)) {
+            Text("BACK TO DASHBOARD", fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -284,14 +316,17 @@ fun MenuTendina(label: String, selezione: String, opzioni: List<String>, onSelec
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(value = if (selezione.isEmpty()) label else selezione, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.menuAnchor().fillMaxWidth())
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            opzioni.forEach { DropdownMenuItem(text = { Text(it) }, onClick = { onSelect(it); expanded = false }) }
+            opzioni.forEach { op -> DropdownMenuItem(text = { Text(op) }, onClick = { onSelect(op); expanded = false }) }
         }
     }
 }
 
 @Composable
 fun PermissionHandler(content: @Composable () -> Unit) {
-    val l = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
-    LaunchedEffect(Unit) { l.launch(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION)) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    LaunchedEffect(Unit) {
+        // Essential automotive diagnostics permissions
+        launcher.launch(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
     content()
 }
