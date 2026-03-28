@@ -1,14 +1,14 @@
-package com.example.automotive.obdapp
+package com.andreaplloci.thesisobdapp
 
-// Definizione dei modelli dati per lo scambio con il backend AI
+// Questo file deve contenere SOLO le definizioni dei dati
 data class ObdData(
     val voltaggioBatteria: String = "0V",
     val codiciErrore: List<String> = emptyList(),
-    val tempLiquidoRaffreddamento: String = "0°C",   // ECT (Engine Coolant Temp)
-    val massaAria: String = "0.0 g/s",              // MAF (Mass Air Flow)
-    val caricoMotore: String = "0%",                // Engine Load
-    val tempAspirazione: String = "0°C",            // IAT (Intake Air Temp)
-    val pressioneRail: String = "0 bar"             // Fuel Rail Pressure
+    val tempLiquidoRaffreddamento: String = "0°C",   // ECT
+    val massaAria: String = "0.0 g/s",              // MAF
+    val caricoMotore: String = "0%",                // Load
+    val tempAspirazione: String = "0°C",            // IAT
+    val pressioneRail: String = "0 bar"             // Fuel Rail
 )
 
 data class MaintenanceWork(
