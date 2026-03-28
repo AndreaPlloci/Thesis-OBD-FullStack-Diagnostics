@@ -1,4 +1,4 @@
-package com.example.automotive.obdapp
+package com.andreaplloci.thesisobdapp
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
