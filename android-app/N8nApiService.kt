@@ -1,4 +1,4 @@
-package com.example.automotive.obdapp
+package com.andreaplloci.thesisobdapp
 
 import retrofit2.Response
 import retrofit2.http.Body
