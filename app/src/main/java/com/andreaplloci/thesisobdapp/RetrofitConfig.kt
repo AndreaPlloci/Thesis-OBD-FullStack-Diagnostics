@@ -6,7 +6,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "https://jarvis.tail34577a.ts.net/"
+    private const val BASE_URL = "https://<YOUR_TAILSCALE_HOST>/"
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
